@@ -27,6 +27,15 @@ function AuthClientPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  function continueWithGoogle() {
+    const next = search.get('next') ?? '/workspaces';
+    const inviteToken = search.get('invite_token') ?? '';
+    const params = new URLSearchParams({ next });
+    if (inviteToken) params.set('invite_token', inviteToken);
+    const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3000';
+    window.location.href = `${apiBase}/api/identity/public/google/start?${params.toString()}`;
+  }
+
   async function submit() {
     setError('');
     setLoading(true);
@@ -88,6 +97,7 @@ function AuthClientPage() {
 
           <div className="mt-6 flex flex-wrap gap-2">
             <Button variant="primary" onClick={submit} disabled={loading}>{loading ? 'Processing...' : mode === 'signup' ? 'Sign up and continue' : 'Sign in'}</Button>
+            <Button onClick={continueWithGoogle} disabled={loading}>Continue with Google</Button>
             <Link href={mode === 'signup' ? '/auth?mode=signin' : '/auth?mode=signup'}>
               <Button>{mode === 'signup' ? 'I already have an account' : 'Create a new account'}</Button>
             </Link>

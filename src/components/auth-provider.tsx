@@ -9,6 +9,10 @@ type MeUser = {
   email: string;
   username?: string | null;
   name?: string | null;
+  display_name?: string | null;
+  avatar_url?: string | null;
+  status_text?: string | null;
+  phone?: string | null;
   role?: string;
 };
 
