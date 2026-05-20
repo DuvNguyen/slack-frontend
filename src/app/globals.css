@@ -1,0 +1,32 @@
+@import 'tailwindcss';
+
+:root {
+  --primary: #1a1a1a;
+  --secondary: #6b6b6b;
+  --tertiary: #d4e157;
+  --neutral: #d9d6d0;
+  --surface: #f0ede6;
+  --on-primary: #1a1a1a;
+
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 2px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  background: var(--neutral);
+  color: var(--primary);
+  font-family: var(--font-archivo), sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
