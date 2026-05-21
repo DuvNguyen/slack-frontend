@@ -1,10 +1,10 @@
 'use client';
 
-import { useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { saveTokens } from '@/lib/auth';
 
-export default function GoogleAuthCallbackPage() {
+function GoogleAuthCallbackClient() {
   const router = useRouter();
   const search = useSearchParams();
 
@@ -30,4 +30,12 @@ export default function GoogleAuthCallbackPage() {
   }, [router, search]);
 
   return <div className="grid min-h-screen place-items-center text-sm text-[#1A1A1A]">Signing you in with Google...</div>;
+}
+
+export default function GoogleAuthCallbackPage() {
+  return (
+    <Suspense fallback={<div className="grid min-h-screen place-items-center text-sm text-[#1A1A1A]">Signing you in with Google...</div>}>
+      <GoogleAuthCallbackClient />
+    </Suspense>
+  );
 }

@@ -1,101 +1,181 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiCall } from '@/lib/api';
 import { getAccessToken } from '@/lib/auth';
 
-type InvitationInfo = {
-  id: string;
+interface InvitationInfo {
   workspace_id: string;
   workspace_name: string;
   email: string;
-  role: 'OWNER' | 'ADMIN' | 'MEMBER';
-  status: 'PENDING' | 'ACCEPTED' | 'REVOKED' | 'EXPIRED';
+  role: string;
+  status: string;
   expires_at: string;
-};
+}
 
-export default function AcceptInvitePage() {
+interface InvitationResponse {
+  ok: boolean;
+  message?: string;
+  invitation?: InvitationInfo;
+}
+
+interface AcceptResponse {
+  ok: boolean;
+  message?: string;
+  workspace_id?: string;
+}
+
+interface MeResponse {
+  user?: {
+    id: string;
+    name?: string | null;
+    display_name?: string | null;
+  };
+}
+
+function InviteAcceptClient() {
   const router = useRouter();
-  const search = useSearchParams();
-  const token = search.get('token') ?? '';
+  const searchParams = useSearchParams();
+  const token = searchParams.get('token');
+  const isTokenMissing = !token;
 
   const [loading, setLoading] = useState(true);
-  const [accepting, setAccepting] = useState(false);
   const [error, setError] = useState('');
   const [invitation, setInvitation] = useState<InvitationInfo | null>(null);
+  
+  const [name, setName] = useState('');
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    async function loadInfo() {
-      if (!token) {
-        setError('Missing invitation token');
-        setLoading(false);
-        return;
-      }
+    if (!getAccessToken()) {
+      router.push('/auth?mode=signin');
+      return;
+    }
+    if (!token) {
+      return;
+    }
 
+    async function load() {
       try {
-        const res = await apiCall<{ ok: boolean; invitation: InvitationInfo }>(`/api/ws/invitations/public/${encodeURIComponent(token)}`);
-        setInvitation(res.invitation);
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Invalid invitation');
+        const res = await apiCall<InvitationResponse>(`/api/ws/invitations/public/${token}`, { method: 'GET' }, true);
+        if (!res.ok) throw new Error(res.message || 'Failed to load invitation');
+        if (res.invitation) {
+          setInvitation(res.invitation);
+        }
+
+        const meRes = await apiCall<MeResponse>('/api/identity/secure/users/me', { method: 'GET' }, true);
+        if (meRes.user) {
+          setName(meRes.user.display_name || meRes.user.name || '');
+        }
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : 'Invitation not found or expired.');
       } finally {
         setLoading(false);
       }
     }
 
-    void loadInfo();
-  }, [token]);
+    void load();
+  }, [token, router]);
 
-  async function accept() {
-    if (!token) return;
-
-    if (!getAccessToken()) {
-      router.push(`/auth?mode=signin&next=/invite/accept&invite_token=${encodeURIComponent(token)}`);
-      return;
-    }
-
-    setAccepting(true);
-    setError('');
+  async function handleAccept() {
+    setSaving(true);
     try {
-      const res = await apiCall<{ ok: boolean; workspace_id: string }>(`/api/ws/invitations/accept/${encodeURIComponent(token)}`, { method: 'POST' }, true);
-      router.push(`/chat?workspaceId=${res.workspace_id}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Cannot accept invitation');
-    } finally {
-      setAccepting(false);
+      if (name.trim()) {
+        await apiCall('/api/chat/profile/me', {
+          method: 'PATCH',
+          body: JSON.stringify({ display_name: name.trim() }),
+        }, true);
+      }
+
+      const res = await apiCall<AcceptResponse>(`/api/ws/invitations/accept/${token}`, {
+        method: 'POST',
+      }, true);
+
+      if (!res.ok) throw new Error(res.message || 'Failed to accept invitation');
+
+      if (res.workspace_id) {
+        router.push(`/chat?workspaceId=${res.workspace_id}`);
+      }
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Something went wrong.');
+      setSaving(false);
     }
+  }
+
+  if (isTokenMissing) {
+    return (
+      <div className="grid h-screen place-items-center bg-[#F7F4EE]">
+        <div className="text-center">
+          <p className="mb-4 text-[#B3261E]">Invalid invitation link.</p>
+          <button onClick={() => router.push('/')} className="text-blue-600 underline">Go home</button>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {
-    return <div className="grid min-h-screen place-items-center text-sm text-[#1A1A1A]">Loading invitation...</div>;
+    return <div className="grid h-screen place-items-center bg-[#F7F4EE]">Loading...</div>;
+  }
+
+  if (error) {
+    return (
+      <div className="grid h-screen place-items-center bg-[#F7F4EE]">
+        <div className="text-center">
+          <p className="mb-4 text-[#B3261E]">{error}</p>
+          <button onClick={() => router.push('/')} className="text-blue-600 underline">Go home</button>
+        </div>
+      </div>
+    );
   }
 
   return (
-    <main className="grid min-h-screen place-items-center bg-[#F6F3EC] px-4 py-10 text-[#1A1A1A]">
-      <section className="w-full max-w-xl border border-[#D3CCBB] bg-white p-6">
-        <h1 className="text-3xl font-bold">Join workspace invitation</h1>
-        {invitation ? (
-          <>
-            <p className="mt-3 text-sm">Workspace: <strong>{invitation.workspace_name}</strong></p>
-            <p className="mt-1 text-sm">Invited email: <strong>{invitation.email}</strong></p>
-            <p className="mt-1 text-sm">Role: <strong>{invitation.role}</strong></p>
-            <p className="mt-1 text-sm">Status: <strong>{invitation.status}</strong></p>
-          </>
-        ) : null}
-
-        {error ? <p className="mt-4 text-sm text-[#B3261E]">{error}</p> : null}
-
-        <div className="mt-6 flex gap-2">
-          <button
-            onClick={() => void accept()}
-            disabled={accepting || !invitation || invitation.status !== 'PENDING'}
-            className="border border-[#6B6B6B] bg-[#C8D65A] px-4 py-2 text-sm font-semibold disabled:opacity-50"
-          >
-            {accepting ? 'Accepting...' : 'Accept invitation'}
-          </button>
-          <button onClick={() => router.push('/auth?mode=signin')} className="border border-[#6B6B6B] px-4 py-2 text-sm">Sign in</button>
+    <div className="grid min-h-screen place-items-center bg-[#F7F4EE] px-4 font-sans text-[#1A1A1A]">
+      <div className="w-full max-w-lg bg-white p-8 md:p-12 shadow-sm border border-[#ddd]">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold mb-4">Join {invitation?.workspace_name} on Slack</h1>
+          <p className="text-[#666]">Slack is where work happens for companies of all sizes.</p>
         </div>
-      </section>
-    </main>
+
+        <div className="mb-8 flex flex-col items-center justify-center text-center">
+           <div className="mb-4 grid h-16 w-16 place-items-center rounded-full bg-[#eee] text-xl font-bold text-[#555]">
+             {invitation?.email?.[0].toUpperCase()}
+           </div>
+           <p className="text-sm text-[#444]"><strong>{invitation?.email}</strong> has been invited to join.</p>
+        </div>
+
+        <div className="border-t border-[#eee] pt-8">
+          <p className="mb-6 text-center text-sm font-semibold">You&apos;re accepting an invitation.</p>
+          
+          <label className="mb-1 block text-sm font-semibold">Your name</label>
+          <input 
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="mb-6 w-full rounded border border-[#6B6B6B] px-3 py-3" 
+            placeholder="What should we call you?"
+          />
+
+          <button 
+            disabled={saving || !name.trim()}
+            onClick={() => void handleAccept()}
+            className="w-full rounded bg-[#4A154B] px-4 py-3 font-bold text-white transition-opacity hover:opacity-90 disabled:opacity-50"
+          >
+            {saving ? 'Joining...' : 'Continue'}
+          </button>
+          
+          <p className="mt-4 text-center text-xs text-[#666]">
+            By continuing, you&apos;re agreeing to Slack&apos;s User Terms of Service.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function InviteAcceptPage() {
+  return (
+    <Suspense fallback={<div className="grid h-screen place-items-center bg-[#F7F4EE]">Loading...</div>}>
+      <InviteAcceptClient />
+    </Suspense>
   );
 }

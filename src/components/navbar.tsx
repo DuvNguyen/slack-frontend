@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useAuth } from './auth-provider';
 import { Button } from './ui';
@@ -17,12 +18,9 @@ export function Navbar({ right }: { right?: React.ReactNode }) {
   return (
     <header className="w-full border-b border-[#6B6B6B] bg-[#D9D6D0] px-4 py-4 md:px-8">
       <div className="flex w-full items-center justify-between gap-3">
-        <Link href="/" className="flex items-center gap-3 hover:opacity-90">
-          <div className="grid h-8 w-8 place-items-center border border-[#6B6B6B] bg-[#D4E157] text-sm font-extrabold">S</div>
-          <div>
-            <p className="text-base font-extrabold tracking-[0.02em] text-[#1A1A1A]">slack</p>
-            <p className="text-xs text-[#1A1A1A]">NestJS microservices + Next.js</p>
-          </div>
+        <Link href="/" className="flex items-center gap-1 hover:opacity-90">
+          <Image src="/slack_icon.png" alt="Slack Logo" width={56} height={56} className="h-14 w-14 object-contain mix-blend-multiply scale-[2]" />
+          <span className="text-3xl font-extrabold tracking-tight text-[#1A1A1A] ml-2">SLACK</span>
         </Link>
 
         <nav className="flex items-center gap-2">
